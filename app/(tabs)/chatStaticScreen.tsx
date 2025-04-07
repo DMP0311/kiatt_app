@@ -11,9 +11,24 @@ import {
   Platform,
   StatusBar,
   ScrollView,
+  Image,
+  Dimensions,
 } from 'react-native';
-import { Send } from 'lucide-react-native';
+import {
+  Send,
+  TreePalm,
+  Umbrella,
+  Utensils,
+  MapPin,
+  Coffee,
+  Clock,
+  HandPlatter,
+  Calendar,
+} from 'lucide-react-native';
 import LoadingAnimation from '../components/LoadingAnimation';
+import { LinearGradient } from 'expo-linear-gradient';
+
+const { width } = Dimensions.get('window');
 
 type Message = {
   id: string;
@@ -25,6 +40,7 @@ type Message = {
 type QuickReply = {
   id: string;
   text: string;
+  icon: React.ReactNode;
 };
 
 // Predefined responses for common questions
@@ -38,7 +54,8 @@ const knowledgeBase = {
   food: 'Our restaurant offers a variety of international and local cuisine. Breakfast is from 6-10 AM, lunch from 12-2 PM, and dinner from 6-10 PM.',
   reservation:
     "I'd be happy to help you with a reservation. Please let me know how many people and what time you'd prefer.",
-  spa: 'Our spa is open daily from 9 AM to 9 PM and offers a range of massages, facials, and body treatments. Would you like to book an appointment?',
+  HandPlatter:
+    'Our spa is open daily from 9 AM to 9 PM and offers a range of massages, facials, and body treatments. Would you like to book an appointment?',
   massage:
     'We offer various massage treatments at our spa, including Swedish, deep tissue, hot stone, and aromatherapy massages. The spa is open from 9 AM to 9 PM.',
   swimming:
@@ -98,15 +115,52 @@ export default function ChatStaticScreen() {
     {
       id: '1',
       sender: 'system',
-      text: 'Welcome to our resort! How may I assist you today?',
+      text: "Welcome to Paradise Resort! I'm your virtual concierge. How may I enhance your stay today?",
       createdAt: new Date().toISOString(),
     },
   ]);
   const [newMessage, setNewMessage] = useState<string>('');
   const quickReplies: QuickReply[] = [
-    { id: '1', text: 'Room cleaning service' },
-    { id: '2', text: 'Restaurant reservation' },
-    { id: '3', text: 'Book a spa appointment' },
+    {
+      id: '1',
+      text: 'Room Service',
+      icon: <Coffee size={16} color="#0891b2" />,
+    },
+    {
+      id: '2',
+      text: 'Restaurant',
+      icon: <Utensils size={16} color="#0891b2" />,
+    },
+    {
+      id: '3',
+      text: 'Spa Services',
+      icon: <HandPlatter size={16} color="#0891b2" />,
+    },
+    {
+      id: '4',
+      text: 'Beach Info',
+      icon: <Umbrella size={16} color="#0891b2" />,
+    },
+    {
+      id: '5',
+      text: 'Activities',
+      icon: <TreePalm size={16} color="#0891b2" />,
+    },
+    {
+      id: '6',
+      text: 'Local Tours',
+      icon: <MapPin size={16} color="#0891b2" />,
+    },
+    {
+      id: '7',
+      text: 'Check-out Time',
+      icon: <Clock size={16} color="#0891b2" />,
+    },
+    {
+      id: '8',
+      text: 'Make Reservation',
+      icon: <Calendar size={16} color="#0891b2" />,
+    },
   ];
   const flatListRef = useRef<FlatList>(null);
 
@@ -145,11 +199,11 @@ export default function ChatStaticScreen() {
 
     // Default responses for no match
     const defaultResponses = [
-      "I'd be happy to help with that. Could you provide more details?",
-      'Thank you for your inquiry. For this specific request, please contact our reception desk.',
-      "I understand you're asking about our resort services. Could you clarify which service you're interested in?",
-      'We have many amenities at our resort. Are you interested in dining, activities, or accommodations?',
-      "I'm here to assist with information about our resort. Could you please be more specific with your request?",
+      "I'd be happy to help with that. Could you provide more details about what you're looking for?",
+      "Our team is ready to make your stay unforgettable. For this specific request, please contact our reception desk or tap 'Room Service' in the quick menu.",
+      "Paradise Resort offers many amenities to enhance your stay. Could you clarify which service you're interested in?",
+      'From beachfront relaxation to exciting excursions, we have everything you need. Are you interested in dining, activities, or wellness services?',
+      "I'm your personal vacation assistant. Could you please be more specific with your request so I can help you enjoy your stay to the fullest?",
     ];
 
     // Return a random default response
@@ -192,25 +246,39 @@ export default function ChatStaticScreen() {
     handleSendMessage(replyText);
   };
 
-  const renderMessage = ({ item }: { item: Message }) => (
-    <View
-      style={[
-        styles.messageBubble,
-        item.sender === 'user' ? styles.userBubble : styles.systemBubble,
-      ]}
-    >
-      <Text
-        style={[
-          styles.messageText,
-          item.sender === 'user'
-            ? styles.userMessageText
-            : styles.systemMessageText,
-        ]}
-      >
-        {item.text}
-      </Text>
-    </View>
-  );
+  // Phần renderMessage
+  const renderMessage = ({ item }: { item: Message }) => {
+    if (item.sender === 'system') {
+      return (
+        <View style={styles.systemMessageRow}>
+          <Image
+            source={require('@/assets/concierge-avatar.png')}
+            style={styles.systemAvatar}
+            defaultSource={require('@/assets/concierge-avatar.png')}
+          />
+          <View style={[styles.messageBubble, styles.systemBubble]}>
+            <Text style={[styles.messageText, styles.systemMessageText]}>
+              {item.text}
+            </Text>
+          </View>
+        </View>
+      );
+    } else {
+      return (
+        <View
+          style={[
+            styles.messageBubble,
+            styles.userBubble,
+            { alignSelf: 'flex-end' },
+          ]}
+        >
+          <Text style={[styles.messageText, styles.userMessageText]}>
+            {item.text}
+          </Text>
+        </View>
+      );
+    }
+  };
 
   if (loading) {
     return <LoadingAnimation />;
@@ -218,12 +286,22 @@ export default function ChatStaticScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <StatusBar barStyle="light-content" backgroundColor="#075985" />
 
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Customer Service</Text>
-      </View>
+      <LinearGradient
+        colors={['rgba(8, 145, 178, 0.3)', 'rgba(8, 145, 178, 0.7)']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.header}
+      >
+        <Image
+          source={require('@/assets/logo.png')}
+          style={styles.logo}
+          defaultSource={require('@/assets/logo.png')}
+        />
+        <Text style={styles.headerTitle}>Virtual Concierge</Text>
+      </LinearGradient>
 
       {/* Message List */}
       <FlatList
@@ -243,6 +321,7 @@ export default function ChatStaticScreen() {
               style={styles.quickReplyButton}
               onPress={() => handleQuickReply(reply.text)}
             >
+              {reply.icon}
               <Text style={styles.quickReplyText}>{reply.text}</Text>
             </TouchableOpacity>
           ))}
@@ -256,7 +335,7 @@ export default function ChatStaticScreen() {
       >
         <TextInput
           style={styles.input}
-          placeholder="Type your message..."
+          placeholder="Ask about your stay..."
           placeholderTextColor="#999"
           value={newMessage}
           onChangeText={setNewMessage}
@@ -287,31 +366,48 @@ export default function ChatStaticScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f8fafc',
+  },
+  backgroundImage: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    opacity: 0.05,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderColor: '#ccc',
-    backgroundColor: '#f8f8f8',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  logo: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginLeft: 16,
-    color: '#0891b2',
+    marginLeft: 12,
+    color: '#fff',
   },
   messageList: {
     padding: 16,
     paddingBottom: 100,
   },
   messageBubble: {
-    marginBottom: 10,
-    padding: 12,
-    borderRadius: 16,
-    maxWidth: '75%',
+    padding: 14,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   userBubble: {
     backgroundColor: '#0891b2',
@@ -319,64 +415,95 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 4,
   },
   systemBubble: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#fff',
     alignSelf: 'flex-start',
     borderBottomLeftRadius: 4,
   },
+  systemAvatarContainer: {
+    position: 'absolute',
+    left: -44,
+    bottom: 0,
+  },
+  systemMessageRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    marginBottom: 16,
+    maxWidth: '80%',
+  },
+  systemAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#fff',
+    marginRight: 8,
+  },
   messageText: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 22,
   },
   userMessageText: {
     color: '#fff',
   },
   systemMessageText: {
-    color: '#000',
+    color: '#334155',
   },
   quickRepliesContainer: {
     borderTopWidth: 1,
-    borderColor: '#eee',
-    paddingVertical: 8,
+    borderColor: '#e2e8f0',
+    paddingVertical: 12,
     backgroundColor: '#fff',
   },
   quickReplyButton: {
-    backgroundColor: '#e0f7fa',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e0f2fe',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 20,
     marginHorizontal: 6,
     borderWidth: 1,
-    borderColor: '#0891b2',
+    borderColor: '#bae6fd',
   },
   quickReplyText: {
     color: '#0891b2',
     fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 6,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 8,
+    padding: 12,
     borderTopWidth: 1,
-    borderColor: '#eee',
+    borderColor: '#e2e8f0',
     backgroundColor: '#fff',
   },
   input: {
     flex: 1,
-    padding: 12,
+    padding: 14,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#cbd5e1',
     borderRadius: 24,
-    marginRight: 8,
-    color: '#000',
+    marginRight: 10,
+    color: '#334155',
+    backgroundColor: '#f8fafc',
   },
   sendButton: {
     backgroundColor: '#0891b2',
-    padding: 12,
-    borderRadius: 24,
+    padding: 14,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#0891b2',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 3,
   },
   sendButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: '#94a3b8',
+    shadowOpacity: 0,
+    elevation: 0,
   },
 });

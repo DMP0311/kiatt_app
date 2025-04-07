@@ -6,12 +6,28 @@ import {
   FlatList,
   TouchableOpacity,
   Alert,
+  ImageBackground,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react-native';
+import {
+  CheckCircle,
+  Clock,
+  XCircle,
+  AlertCircle,
+  CalendarDays,
+  MapPin,
+  Users,
+  DollarSign,
+  HandPlatter,
+  UtensilsCrossed,
+  Bed,
+  Info,
+} from 'lucide-react-native';
 import LoadingAnimation from '../components/LoadingAnimation';
+import { LinearGradient } from 'expo-linear-gradient';
 
 /** Kiểu room_bookings */
 type RoomBooking = {
@@ -57,6 +73,7 @@ type UnifiedBooking = {
   status: string | null;
   total_price: number;
   created_at?: string | null;
+  guest_count?: number;
 
   // Thuộc tính cho room
   room_id?: string;
@@ -73,6 +90,31 @@ type UnifiedBooking = {
   service_name?: string;
   service_category?: string;
   special_requests?: string | null;
+};
+
+// Placeholder images according to booking types
+const getPlaceholderImage = (
+  type: string,
+  roomType?: string,
+  serviceCategory?: string,
+) => {
+  if (type === 'room') {
+    if (roomType?.toLowerCase().includes('villa')) {
+      return 'https://images.unsplash.com/photo-1582610116397-edb318620f90?q=80&w=300';
+    } else if (roomType?.toLowerCase().includes('suite')) {
+      return 'https://images.unsplash.com/photo-1631049035326-57414bd8b08d?q=80&w=300';
+    } else {
+      return 'https://images.unsplash.com/photo-1590490360182-c33d57733427?q=80&w=300';
+    }
+  } else {
+    if (serviceCategory?.toLowerCase().includes('HandPlatter ')) {
+      return 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=300';
+    } else if (serviceCategory?.toLowerCase().includes('dining')) {
+      return 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?q=80&w=300';
+    } else {
+      return 'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=300';
+    }
+  }
 };
 
 export default function BookingsScreen() {
@@ -153,7 +195,7 @@ export default function BookingsScreen() {
           room_number,
           room_type
         )
-      `
+      `,
       )
       .eq('user_id', userId)
       .order('check_in_date', { ascending: true });
@@ -173,6 +215,7 @@ export default function BookingsScreen() {
       room_number: r.room?.room_number,
       room_type: r.room?.room_type,
       special_reque: r.special_reque,
+      guest_count: r.guest_count,
     })) as UnifiedBooking[];
     return unified;
   };
@@ -188,7 +231,7 @@ export default function BookingsScreen() {
           name,
           category
         )
-      `
+      `,
       )
       .eq('user_id', userId)
       .order('booking_date', { ascending: true });
@@ -208,6 +251,7 @@ export default function BookingsScreen() {
       service_name: s.service?.name,
       service_category: s.service?.category,
       special_requests: s.notes,
+      guest_count: s.guest_count,
     })) as UnifiedBooking[];
     return unified;
   };
@@ -254,6 +298,15 @@ export default function BookingsScreen() {
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
 
+  // Calculate nights for room bookings
+  const calculateNights = (checkIn?: string, checkOut?: string) => {
+    if (!checkIn || !checkOut) return 0;
+    const start = new Date(checkIn);
+    const end = new Date(checkOut);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
   /** Màu status */
   const getStatusColor = (status: string | null) => {
     switch (status) {
@@ -272,13 +325,13 @@ export default function BookingsScreen() {
   const getStatusIcon = (status: string | null) => {
     switch (status) {
       case 'confirmed':
-        return <CheckCircle size={16} color="#16a34a" />;
+        return <CheckCircle size={16} color="#ffffff" />;
       case 'pending':
-        return <Clock size={16} color="#f59e0b" />;
+        return <Clock size={16} color="#ffffff" />;
       case 'cancelled':
-        return <XCircle size={16} color="#ef4444" />;
+        return <XCircle size={16} color="#ffffff" />;
       default:
-        return <AlertCircle size={16} color="#64748b" />;
+        return <AlertCircle size={16} color="#ffffff" />;
     }
   };
 
@@ -286,99 +339,139 @@ export default function BookingsScreen() {
   const renderBookingItem = ({ item }: { item: UnifiedBooking }) => {
     let title = '';
     let subTitle = '';
-    let dateLabel = '';
-    let dateValue = '';
 
     if (item.type === 'room') {
       title = item.room_type || 'Room';
       subTitle = item.room_number ? `Room ${item.room_number}` : 'Room Booking';
-      dateLabel = 'Check-in';
-      dateValue = item.check_in_date || '';
     } else {
       title = item.service_name || 'Service';
-      subTitle = 'Service Booking';
-      dateLabel = 'Booking Date';
-      dateValue = item.booking_date || '';
+      subTitle = item.service_category || 'Service Booking';
     }
+
+    // Get placeholder image based on booking type
+    const imageUrl = getPlaceholderImage(
+      item.type,
+      item.room_type,
+      item.service_category,
+    );
+
+    // Calculate nights for room bookings
+    const nights =
+      item.type === 'room'
+        ? calculateNights(item.check_in_date, item.check_out_date)
+        : 0;
 
     return (
       <View style={styles.card}>
-        {/* Header */}
-        <View style={styles.cardHeader}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.cardTitle}>{title}</Text>
+        {/* Card Image */}
+        <ImageBackground
+          source={{ uri: imageUrl }}
+          style={styles.cardImage}
+          imageStyle={{ borderTopLeftRadius: 16, borderTopRightRadius: 16 }}
+        >
+          <LinearGradient
+            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.7)']}
+            style={styles.imageDarkOverlay}
+          >
+            <View style={styles.cardImageContent}>
+              <View
+                style={[
+                  styles.statusBadge,
+                  { backgroundColor: `${getStatusColor(item.status)}DD` },
+                ]}
+              >
+                {getStatusIcon(item.status)}
+                <Text style={styles.statusText}>
+                  {item.status || 'Unknown'}
+                </Text>
+              </View>
+            </View>
+          </LinearGradient>
+        </ImageBackground>
+
+        {/* Card Body */}
+        <View style={styles.cardBody}>
+          <Text style={styles.cardTitle}>{title}</Text>
+          <View style={styles.cardSubtitleContainer}>
+            {item.type === 'room' ? (
+              <Bed size={16} color="#0891b2" />
+            ) : (
+              <HandPlatter size={16} color="#0891b2" />
+            )}
             <Text style={styles.cardSubtitle}>{subTitle}</Text>
           </View>
-          <View
-            style={[
-              styles.statusBadge,
-              { backgroundColor: `${getStatusColor(item.status)}20` },
-            ]}
-          >
-            {getStatusIcon(item.status)}
-            <Text
-              style={[
-                styles.statusText,
-                { color: getStatusColor(item.status) },
-              ]}
-            >
-              {item.status || 'Unknown'}
-            </Text>
+
+          {/* Details */}
+          <View style={styles.detailsContainer}>
+            {/* Date details */}
+            <View style={styles.detailRow}>
+              <CalendarDays size={16} color="#64748b" />
+              <View style={styles.detailContent}>
+                {item.type === 'room' ? (
+                  <>
+                    <Text style={styles.detailLabel}>Stay Period</Text>
+                    <Text style={styles.detailValue}>
+                      {formatDateOnly(item.check_in_date)} -{' '}
+                      {formatDateOnly(item.check_out_date)}
+                      <Text style={styles.highlightText}>
+                        {' '}
+                        ({nights} nights)
+                      </Text>
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.detailLabel}>Booking Date</Text>
+                    <Text style={styles.detailValue}>
+                      {formatDateOnly(item.booking_date)}
+                      {item.time && <Text> at {item.time}</Text>}
+                    </Text>
+                  </>
+                )}
+              </View>
+            </View>
+
+            {/* Guests */}
+            <View style={styles.detailRow}>
+              <Users size={16} color="#64748b" />
+              <View style={styles.detailContent}>
+                <Text style={styles.detailLabel}>Guests</Text>
+                <Text style={styles.detailValue}>
+                  {item.guest_count || 1} person(s)
+                </Text>
+              </View>
+            </View>
+
+            {/* Price */}
+            <View style={styles.detailRow}>
+              <DollarSign size={16} color="#64748b" />
+              <View style={styles.detailContent}>
+                <Text style={styles.detailLabel}>Total Price</Text>
+                <Text style={styles.priceValue}>${item.total_price}</Text>
+              </View>
+            </View>
+
+            {/* Special Requests/Notes */}
+            {((item.special_reque && item.type === 'room') ||
+              (item.special_requests && item.type === 'service')) && (
+              <View style={styles.detailRow}>
+                <Info size={16} color="#64748b" />
+                <View style={styles.detailContent}>
+                  <Text style={styles.detailLabel}>
+                    {item.type === 'room' ? 'Special Requests' : 'Notes'}
+                  </Text>
+                  <Text style={styles.detailValue}>
+                    {item.type === 'room'
+                      ? item.special_reque
+                      : item.special_requests}
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
         </View>
 
-        {/* Body */}
-        <View style={styles.cardBody}>
-          <View style={styles.row}>
-            <Text style={styles.label}>{dateLabel}:</Text>
-            <Text style={styles.value}>{formatDateOnly(dateValue)}</Text>
-          </View>
-          {item.type === 'room' && item.check_out_date && (
-            <View style={styles.row}>
-              <Text style={styles.label}>Check-out:</Text>
-              <Text style={styles.value}>
-                {formatDateOnly(item.check_out_date)}
-              </Text>
-            </View>
-          )}
-
-          {item.type === 'service' && item.time && (
-            <View style={styles.row}>
-              <Text style={styles.label}>Time:</Text>
-              <Text style={styles.value}>{item.time}</Text>
-            </View>
-          )}
-
-          <View style={styles.row}>
-            <Text style={styles.label}>Total:</Text>
-            <Text style={[styles.value, styles.priceValue]}>
-              ${item.total_price}
-            </Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Booked At:</Text>
-            <Text style={styles.value}>{formatDateOnly(item.created_at)}</Text>
-          </View>
-          {/* Special requests cho room hoặc service tuỳ cột */}
-          {item.special_reque && item.type === 'room' && (
-            <View
-              style={[styles.row, { flexDirection: 'column', marginTop: 8 }]}
-            >
-              <Text style={styles.label}>Special Requests:</Text>
-              <Text style={styles.value}>{item.special_reque}</Text>
-            </View>
-          )}
-          {item.special_requests && item.type === 'service' && (
-            <View
-              style={[styles.row, { flexDirection: 'column', marginTop: 8 }]}
-            >
-              <Text style={styles.label}>Notes:</Text>
-              <Text style={styles.value}>{item.special_requests}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Footer */}
+        {/* Card Footer */}
         <View style={styles.cardFooter}>
           {item.type === 'room' ? (
             <Link href={`/room/${item.room_id}`} asChild>
@@ -411,13 +504,28 @@ export default function BookingsScreen() {
   }
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>My Bookings</Text>
-      </View>
+    <SafeAreaView edges={['top']} style={styles.container}>
+      {/* Backdrop Header */}
+      <ImageBackground
+        source={{
+          uri: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=1080',
+        }}
+        style={styles.headerBackground}
+      >
+        <LinearGradient
+          colors={['rgba(0,0,0,0.6)', 'rgba(0,0,0,0)']}
+          style={styles.headerGradient}
+        >
+          <View style={styles.header}>
+            <Text style={styles.title}>My Trips</Text>
+            <Text style={styles.subtitle}>
+              Manage your bookings and reservations
+            </Text>
+          </View>
+        </LinearGradient>
+      </ImageBackground>
 
-      {/* Tabs: all, room, service */}
+      {/* Tabs with icons */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'all' && styles.activeTab]}
@@ -429,7 +537,7 @@ export default function BookingsScreen() {
               activeTab === 'all' && styles.activeTabText,
             ]}
           >
-            All
+            All Trips
           </Text>
         </TouchableOpacity>
 
@@ -437,13 +545,14 @@ export default function BookingsScreen() {
           style={[styles.tab, activeTab === 'room' && styles.activeTab]}
           onPress={() => setActiveTab('room')}
         >
+          <Bed size={14} color={activeTab === 'room' ? '#ffffff' : '#64748b'} />
           <Text
             style={[
               styles.tabText,
               activeTab === 'room' && styles.activeTabText,
             ]}
           >
-            Room
+            Stays
           </Text>
         </TouchableOpacity>
 
@@ -451,13 +560,17 @@ export default function BookingsScreen() {
           style={[styles.tab, activeTab === 'service' && styles.activeTab]}
           onPress={() => setActiveTab('service')}
         >
+          <HandPlatter
+            size={14}
+            color={activeTab === 'service' ? '#ffffff' : '#64748b'}
+          />
           <Text
             style={[
               styles.tabText,
               activeTab === 'service' && styles.activeTabText,
             ]}
           >
-            Service
+            Experiences
           </Text>
         </TouchableOpacity>
       </View>
@@ -470,13 +583,17 @@ export default function BookingsScreen() {
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyTitle}>No bookings found</Text>
+            <Image
+              source={{ uri: 'https://img.icons8.com/fluency/96/suitcase.png' }}
+              style={styles.emptyIcon}
+            />
+            <Text style={styles.emptyTitle}>No trips found</Text>
             <Text style={styles.emptyText}>
               {activeTab === 'all'
-                ? "You don't have any bookings yet."
+                ? "You don't have any bookings yet. Start planning your dream vacation!"
                 : activeTab === 'room'
-                ? "You don't have any room bookings."
-                : "You don't have any service bookings."}
+                  ? "You don't have any room bookings. Check out our amazing stays!"
+                  : "You don't have any experiences booked. Discover exciting activities!"}
             </Text>
           </View>
         }
@@ -491,37 +608,51 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
-  loadingWrapper: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  headerBackground: {
+    height: 160,
   },
-  loadingText: {
-    marginTop: 8,
-    fontSize: 16,
-    color: '#64748b',
+  headerGradient: {
+    height: '100%',
+    justifyContent: 'flex-end',
   },
   header: {
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 8,
+    paddingBottom: 24,
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
-    color: '#1e293b',
+    color: '#ffffff',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#f1f5f9',
+    marginTop: 4,
   },
   tabContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,
-    marginBottom: 12,
+    paddingVertical: 16,
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+    marginBottom: 8,
   },
   tab: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 8,
     paddingHorizontal: 16,
-    borderRadius: 20,
+    borderRadius: 24,
     marginRight: 8,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: '#f1f5f9',
   },
   activeTab: {
     backgroundColor: '#0891b2',
@@ -530,91 +661,92 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#64748b',
+    marginLeft: 4,
   },
   activeTabText: {
     color: '#ffffff',
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    marginBottom: 8,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#64748b',
-    textAlign: 'center',
-    marginBottom: 16,
+    paddingTop: 8,
+    paddingBottom: 24,
   },
   card: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
-    marginBottom: 16,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
+    marginBottom: 20,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  cardHeader: {
+  cardImage: {
+    height: 150,
+    width: '100%',
+  },
+  imageDarkOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  cardImageContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1e293b',
-  },
-  cardSubtitle: {
-    fontSize: 14,
-    color: '#64748b',
-    marginTop: 2,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 16,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginLeft: 4,
-    textTransform: 'capitalize',
+    justifyContent: 'flex-end',
+    padding: 12,
   },
   cardBody: {
     padding: 16,
   },
-  row: {
+  cardTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1e293b',
+  },
+  cardSubtitleContainer: {
     flexDirection: 'row',
-    marginBottom: 8,
+    alignItems: 'center',
+    marginTop: 4,
+    marginBottom: 12,
   },
-  label: {
+  cardSubtitle: {
     fontSize: 14,
-    color: '#64748b',
-    marginRight: 4,
+    color: '#0891b2',
+    marginLeft: 6,
+    fontWeight: '500',
   },
-  value: {
+  detailsContainer: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 8,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    marginBottom: 12,
+    alignItems: 'flex-start',
+  },
+  detailContent: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  detailLabel: {
+    fontSize: 12,
+    color: '#64748b',
+    marginBottom: 2,
+  },
+  detailValue: {
     fontSize: 14,
     color: '#1e293b',
   },
-  priceValue: {
+  highlightText: {
     color: '#0891b2',
+    fontWeight: '500',
+  },
+  priceValue: {
+    fontSize: 16,
     fontWeight: 'bold',
+    color: '#0891b2',
   },
   cardFooter: {
     flexDirection: 'row',
@@ -637,15 +769,56 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
-    backgroundColor: '#fee2e2',
+    backgroundColor: '#fef2f2',
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
     marginLeft: 8,
+    borderWidth: 1,
+    borderColor: '#fee2e2',
   },
   cancelButtonText: {
     color: '#ef4444',
     fontWeight: '600',
     fontSize: 16,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    marginTop: 16,
+  },
+  emptyIcon: {
+    width: 96,
+    height: 96,
+    marginBottom: 16,
+    opacity: 0.8,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 8,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#64748b',
+    textAlign: 'center',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+    color: '#ffffff',
+    textTransform: 'capitalize',
   },
 });

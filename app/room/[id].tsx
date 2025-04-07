@@ -142,7 +142,7 @@ export default function RoomDetailScreen() {
       check_in_date: string;
       check_out_date: string;
       status: string | null;
-    }>
+    }>,
   ) => {
     let result: { [date: string]: any } = {};
     bookingData.forEach((bk) => {
@@ -179,7 +179,7 @@ export default function RoomDetailScreen() {
       if (selected <= checkInDate) {
         Alert.alert(
           'Invalid Date',
-          'Check-out date must be after check-in date.'
+          'Check-out date must be after check-in date.',
         );
       } else {
         setCheckOutDate(selected);
@@ -232,14 +232,14 @@ export default function RoomDetailScreen() {
     if (!checkInDate || !checkOutDate) {
       Alert.alert(
         'Select Dates',
-        'Please select check-in and check-out dates first.'
+        'Please select check-in and check-out dates first.',
       );
       return;
     }
     if (checkInDate >= checkOutDate) {
       Alert.alert(
         'Invalid Dates',
-        'Check-out date must be after check-in date.'
+        'Check-out date must be after check-in date.',
       );
       return;
     }
@@ -267,7 +267,7 @@ export default function RoomDetailScreen() {
     if (numGuests > room.capacity) {
       Alert.alert(
         'Invalid Guest Count',
-        `Number of guests cannot exceed ${room.capacity}.`
+        `Number of guests cannot exceed ${room.capacity}.`,
       );
       return;
     }
@@ -275,7 +275,7 @@ export default function RoomDetailScreen() {
     if (nights <= 0) {
       Alert.alert(
         'Invalid Date Range',
-        'Check-out date must be after check-in date.'
+        'Check-out date must be after check-in date.',
       );
       return;
     }
@@ -494,7 +494,7 @@ export default function RoomDetailScreen() {
                   if (bookedDates[day.dateString]?.disabled) {
                     Alert.alert(
                       'Booked',
-                      'This day is already booked. Please choose another day.'
+                      'This day is already booked. Please choose another day.',
                     );
                     return;
                   }

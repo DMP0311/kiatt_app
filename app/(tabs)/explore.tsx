@@ -11,6 +11,7 @@ import {
   Modal,
   Dimensions,
   Keyboard,
+  ImageBackground,
 } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { Link } from 'expo-router';
@@ -20,6 +21,10 @@ import {
   Star,
   ChevronLeft,
   ChevronRight,
+  MapPin,
+  Users,
+  Coffee,
+  Palmtree,
 } from 'lucide-react-native';
 import LoadingAnimation from '../components/LoadingAnimation';
 
@@ -31,16 +36,19 @@ type Room = {
   price_per_night: number;
   images: string[] | null;
   capacity?: number;
+  amenities?: string[];
+  view_type?: string;
 };
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const ROOMS_PER_PAGE = 10;
+const ROOMS_PER_PAGE = 8;
 
 export default function ExploreScreen() {
   // Data states
   const [rooms, setRooms] = useState<Room[]>([]);
   const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
   const [roomCategories, setRoomCategories] = useState<string[]>([]);
+  const [featuredExperiences, setFeaturedExperiences] = useState<Room[]>([]);
 
   // UI states
   const [activeCategory, setActiveCategory] = useState('All');
@@ -52,6 +60,8 @@ export default function ExploreScreen() {
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
   const [minCapacity, setMinCapacity] = useState('');
+  const [selectedView, setSelectedView] = useState('All');
+  const viewTypes = ['All', 'Ocean', 'Garden', 'Pool', 'Mountain'];
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -64,8 +74,16 @@ export default function ExploreScreen() {
 
   useEffect(() => {
     applyFilters();
-    setCurrentPage(1); // Reset về trang đầu mỗi khi filter thay đổi
-  }, [searchQuery, activeCategory, rooms, minPrice, maxPrice, minCapacity]);
+    setCurrentPage(1); // Reset to first page whenever filters change
+  }, [
+    searchQuery,
+    activeCategory,
+    rooms,
+    minPrice,
+    maxPrice,
+    minCapacity,
+    selectedView,
+  ]);
 
   const fetchRooms = async () => {
     try {
@@ -75,8 +93,33 @@ export default function ExploreScreen() {
         .select('*')
         .order('room_type', { ascending: true });
       if (error) throw error;
-      setRooms(data || []);
-      setFilteredRooms(data || []);
+
+      // Add mock data cho view_type và amenities nếu chưa có
+      const enhancedData = (data || []).map((room) => ({
+        ...room,
+        view_type:
+          room.view_type ||
+          ['Ocean', 'Garden', 'Pool', 'Mountain'][
+            Math.floor(Math.random() * 4)
+          ],
+        amenities: room.amenities || [
+          'Free WiFi',
+          'Room Service',
+          'Mini Bar',
+          'Sea View',
+        ],
+      }));
+
+      setRooms(enhancedData);
+      setFilteredRooms(enhancedData);
+
+      // Lấy ngẫu nhiên 3 phòng để làm Featured Experiences
+      if (enhancedData.length > 0) {
+        const randomRooms = enhancedData
+          .sort(() => 0.5 - Math.random())
+          .slice(0, 3);
+        setFeaturedExperiences(randomRooms);
+      }
     } catch (err) {
       console.error('Error fetching rooms:', err);
     } finally {
@@ -101,31 +144,36 @@ export default function ExploreScreen() {
     let filtered = [...rooms];
     const query = searchQuery.toLowerCase();
 
-    // Lọc theo từ khóa
+    // Lọc theo search query
     if (query.trim() !== '') {
       filtered = filtered.filter(
         (room) =>
           room.room_number.toLowerCase().includes(query) ||
           (room.room_type && room.room_type.toLowerCase().includes(query)) ||
-          room.description.toLowerCase().includes(query)
+          room.description.toLowerCase().includes(query),
       );
     }
 
-    // Lọc theo loại phòng (nếu không phải "All")
+    // Lọc theo loại phòng (nếu không chọn "All")
     if (activeCategory !== 'All') {
       filtered = filtered.filter(
-        (room) => (room.room_type || 'Standard') === activeCategory
+        (room) => (room.room_type || 'Standard') === activeCategory,
       );
     }
 
-    // Lọc theo giá
+    // Lọc theo view (nếu không chọn "All")
+    if (selectedView !== 'All') {
+      filtered = filtered.filter((room) => room.view_type === selectedView);
+    }
+
+    // Lọc theo khoảng giá
     const minP = parseFloat(minPrice) || 0;
     const maxP = parseFloat(maxPrice) || Number.MAX_SAFE_INTEGER;
     filtered = filtered.filter(
-      (room) => room.price_per_night >= minP && room.price_per_night <= maxP
+      (room) => room.price_per_night >= minP && room.price_per_night <= maxP,
     );
 
-    // Lọc theo sức chứa (nếu có)
+    // Lọc theo sức chứa
     const minC = parseInt(minCapacity) || 0;
     if (minC > 0) {
       filtered = filtered.filter((room) => (room.capacity || 0) >= minC);
@@ -134,13 +182,13 @@ export default function ExploreScreen() {
     setFilteredRooms(filtered);
   };
 
-  // Phân trang: Lấy danh sách phòng của trang hiện tại
+  // Lấy danh sách phòng theo trang hiện tại
   const currentRooms = filteredRooms.slice(
     (currentPage - 1) * ROOMS_PER_PAGE,
-    currentPage * ROOMS_PER_PAGE
+    currentPage * ROOMS_PER_PAGE,
   );
 
-  // Render tab loại phòng
+  // Render tab Category
   const renderCategoryTab = ({ item }: { item: string }) => {
     const isActive = item === activeCategory;
     return (
@@ -160,29 +208,113 @@ export default function ExploreScreen() {
     );
   };
 
-  // Render card phòng trong grid 2 cột
-  const renderRoomCard = ({ item }: { item: Room }) => (
+  // Render Featured Experience sử dụng dữ liệu phòng
+  // const renderExperience = ({ item }: { item: Room }) => (
+  //   <Link href={`/room/${item.id}`} asChild>
+  //     <TouchableOpacity style={styles.experienceCard}>
+  //       <Image
+  //         source={{
+  //           uri:
+  //             item.images && item.images.length > 0
+  //               ? item.images[0]
+  //               : 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?q=80&w=2070&auto=format&fit=crop',
+  //         }}
+  //         style={styles.experienceImage}
+  //       />
+  //       <View style={styles.experienceOverlay} />
+  //       <View style={styles.experienceContent}>
+  //         <Text style={styles.experienceTitle}>
+  //           {item.room_type} Room {item.room_number}
+  //         </Text>
+  //         <Text style={styles.experiencePrice}>${item.price_per_night}</Text>
+  //       </View>
+  //     </TouchableOpacity>
+  //   </Link>
+  // );
+  // Render Featured Experience với Link để booking phòng khi nhấn
+  const renderExperience = ({ item }: { item: Room }) => (
     <Link href={`/room/${item.id}`} asChild>
-      <TouchableOpacity style={styles.card}>
+      <TouchableOpacity style={styles.experienceCard}>
         <Image
           source={{
             uri:
               item.images && item.images.length > 0
                 ? item.images[0]
-                : 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?q=80&w=2940&auto=format&fit=crop',
+                : 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?q=80&w=2070&auto=format&fit=crop',
+          }}
+          style={styles.experienceImage}
+        />
+        <View style={styles.experienceOverlay} />
+        <View style={styles.experienceContent}>
+          <Text style={styles.experienceTitle}>
+            {item.room_type} Room {item.room_number}
+          </Text>
+          <Text style={styles.experiencePrice}>${item.price_per_night}</Text>
+          {/* Extra information: capacity and amenities */}
+          <View style={styles.experienceExtraInfo}>
+            <Text style={styles.experienceCapacity}>
+              <Users size={12} color="#fff" /> {item.capacity || 2} Guests
+            </Text>
+            {item.amenities && item.amenities.length > 0 && (
+              <Text style={styles.experienceAmenities}>
+                {item.amenities.slice(0, 2).join(', ')}
+              </Text>
+            )}
+          </View>
+        </View>
+      </TouchableOpacity>
+    </Link>
+  );
+
+  // Render room card
+  const renderRoomCard = ({ item }: { item: Room }) => (
+    <Link href={`/room/${item.id}`} asChild>
+      <TouchableOpacity style={styles.card}>
+        <ImageBackground
+          source={{
+            uri:
+              item.images && item.images.length > 0
+                ? item.images[0]
+                : 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?q=80&w=2070&auto=format&fit=crop',
           }}
           style={styles.cardImage}
-        />
+          imageStyle={{ borderTopLeftRadius: 16, borderTopRightRadius: 16 }}
+        >
+          <View style={styles.viewBadge}>
+            <MapPin size={12} color="#fff" />
+            <Text style={styles.viewBadgeText}>{item.view_type} View</Text>
+          </View>
+        </ImageBackground>
         <View style={styles.cardBody}>
-          <Text style={styles.cardTitle}>Room {item.room_number}</Text>
-          <Text style={styles.cardDescription} numberOfLines={2}>
-            {item.description}
-          </Text>
+          <Text style={styles.cardTitle}>{item.room_type} Room</Text>
+          <Text style={styles.roomNumber}>Room {item.room_number}</Text>
+          <View style={styles.amenitiesRow}>
+            <View style={styles.amenityItem}>
+              <Users size={14} color="#64748b" />
+              <Text style={styles.amenityText}>{item.capacity || 2}</Text>
+            </View>
+            {item.amenities &&
+              item.amenities.slice(0, 2).map((amenity, index) => (
+                <View key={index} style={styles.amenityItem}>
+                  {index === 0 ? (
+                    <Coffee size={14} color="#64748b" />
+                  ) : (
+                    <Palmtree size={14} color="#64748b" />
+                  )}
+                  <Text style={styles.amenityText} numberOfLines={1}>
+                    {amenity}
+                  </Text>
+                </View>
+              ))}
+          </View>
           <View style={styles.cardFooter}>
-            <Text style={styles.cardPrice}>${item.price_per_night}/night</Text>
+            <Text style={styles.cardPrice}>${item.price_per_night}</Text>
+            <Text style={styles.perNight}>/night</Text>
             <View style={styles.ratingContainer}>
-              <Star size={16} color="#f59e0b" fill="#f59e0b" />
-              <Text style={styles.ratingText}>4.8</Text>
+              <Star size={14} color="#f59e0b" fill="#f59e0b" />
+              <Text style={styles.ratingText}>
+                {(4 + Math.random()).toFixed(1)}
+              </Text>
             </View>
           </View>
         </View>
@@ -190,26 +322,29 @@ export default function ExploreScreen() {
     </Link>
   );
 
-  // Render Pagination Controls (sẽ được đặt làm ListFooterComponent)
+  // Render Pagination Controls
   const renderPagination = () => {
     if (totalPages <= 1) return null;
     return (
       <View style={styles.paginationContainer}>
         <TouchableOpacity
-          style={styles.paginationButton}
+          style={[
+            styles.paginationButton,
+            currentPage === 1 && styles.paginationButtonDisabled,
+          ]}
           onPress={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
           disabled={currentPage === 1}
         >
-          <ChevronLeft
-            size={20}
-            color={currentPage === 1 ? '#ccc' : '#0891b2'}
-          />
+          <ChevronLeft size={20} color={currentPage === 1 ? '#ccc' : '#fff'} />
         </TouchableOpacity>
         <Text style={styles.paginationText}>
           {currentPage} / {totalPages}
         </Text>
         <TouchableOpacity
-          style={styles.paginationButton}
+          style={[
+            styles.paginationButton,
+            currentPage === totalPages && styles.paginationButtonDisabled,
+          ]}
           onPress={() =>
             setCurrentPage((prev) => Math.min(prev + 1, totalPages))
           }
@@ -217,34 +352,39 @@ export default function ExploreScreen() {
         >
           <ChevronRight
             size={20}
-            color={currentPage === totalPages ? '#ccc' : '#0891b2'}
+            color={currentPage === totalPages ? '#ccc' : '#fff'}
           />
         </TouchableOpacity>
       </View>
     );
   };
 
-  // Header: Banner, Search Bar, Category Tabs
+  // Header: Banner, Search Bar, Category Tabs, Experiences
   const renderHeader = () => (
     <View>
       {/* Banner */}
-      <View style={styles.bannerContainer}>
-        <Image
-          source={{
-            uri: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=2940&auto=format&fit=crop',
-          }}
-          style={styles.bannerImage}
-        />
+      <ImageBackground
+        source={{
+          uri: 'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?q=80&w=2070&auto=format&fit=crop',
+        }}
+        style={styles.bannerContainer}
+      >
         <View style={styles.bannerOverlay} />
-        <Text style={styles.bannerText}>Find Your Perfect Room</Text>
-      </View>
+        <View style={styles.bannerContent}>
+          <Text style={styles.bannerTitle}>Paradise Resort</Text>
+          <Text style={styles.bannerText}>Discover Luxury Accommodations</Text>
+          <TouchableOpacity style={styles.specialOffersButton}>
+            <Text style={styles.specialOffersButtonText}>Special Offers</Text>
+          </TouchableOpacity>
+        </View>
+      </ImageBackground>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <Search size={20} color="#64748b" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search by room number, type, or description..."
+          placeholder="Search for your perfect stay..."
           placeholderTextColor="#9ca3af"
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -259,6 +399,20 @@ export default function ExploreScreen() {
           <Filter size={20} color="#fff" />
         </TouchableOpacity>
       </View>
+
+      {/* Featured Experiences Section */}
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Featured Experiences</Text>
+      </View>
+
+      <FlatList
+        data={featuredExperiences}
+        horizontal
+        keyExtractor={(item) => item.id}
+        renderItem={renderExperience}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.experiencesContainer}
+      />
 
       {/* Category Tabs */}
       <FlatList
@@ -281,7 +435,7 @@ export default function ExploreScreen() {
       {/* Header */}
       <View style={styles.headerContainer}>{renderHeader()}</View>
 
-      {/* Danh sách phòng dạng grid kèm Pagination Footer */}
+      {/* Room list with pagination footer */}
       <FlatList
         data={currentRooms}
         renderItem={renderRoomCard}
@@ -291,6 +445,24 @@ export default function ExploreScreen() {
         contentContainerStyle={styles.gridContainer}
         keyboardShouldPersistTaps="always"
         ListFooterComponent={renderPagination}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No rooms match your criteria</Text>
+            <TouchableOpacity
+              style={styles.resetButton}
+              onPress={() => {
+                setSearchQuery('');
+                setActiveCategory('All');
+                setMinPrice('');
+                setMaxPrice('');
+                setMinCapacity('');
+                setSelectedView('All');
+              }}
+            >
+              <Text style={styles.resetButtonText}>Reset Filters</Text>
+            </TouchableOpacity>
+          </View>
+        }
       />
 
       {/* Advanced Filter Modal */}
@@ -302,56 +474,67 @@ export default function ExploreScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Advanced Filters</Text>
-
-            <Text style={styles.modalLabel}>Min Price ($)</Text>
+            <Text style={styles.modalTitle}>Refine Your Search</Text>
+            <Text style={styles.modalLabel}>Price Range ($ per night)</Text>
+            <View style={styles.priceInputContainer}>
+              <TextInput
+                style={[styles.modalInput, styles.priceInput]}
+                keyboardType="numeric"
+                placeholder="Min"
+                value={minPrice}
+                onChangeText={setMinPrice}
+              />
+              <Text style={styles.priceSeparator}>to</Text>
+              <TextInput
+                style={[styles.modalInput, styles.priceInput]}
+                keyboardType="numeric"
+                placeholder="Max"
+                value={maxPrice}
+                onChangeText={setMaxPrice}
+              />
+            </View>
+            <Text style={styles.modalLabel}>Guests</Text>
             <TextInput
               style={styles.modalInput}
               keyboardType="numeric"
-              placeholder="e.g., 50"
-              value={minPrice}
-              onChangeText={setMinPrice}
-            />
-
-            <Text style={styles.modalLabel}>Max Price ($)</Text>
-            <TextInput
-              style={styles.modalInput}
-              keyboardType="numeric"
-              placeholder="e.g., 300"
-              value={maxPrice}
-              onChangeText={setMaxPrice}
-            />
-
-            <Text style={styles.modalLabel}>Min Capacity</Text>
-            <TextInput
-              style={styles.modalInput}
-              keyboardType="numeric"
-              placeholder="e.g., 2"
+              placeholder="Number of guests"
               value={minCapacity}
               onChangeText={setMinCapacity}
             />
-
+            <Text style={styles.modalLabel}>View</Text>
+            <View style={styles.viewOptionsContainer}>
+              {viewTypes.map((view) => (
+                <TouchableOpacity
+                  key={view}
+                  style={[
+                    styles.viewOption,
+                    selectedView === view && styles.viewOptionSelected,
+                  ]}
+                  onPress={() => setSelectedView(view)}
+                >
+                  <Text
+                    style={[
+                      styles.viewOptionText,
+                      selectedView === view && styles.viewOptionTextSelected,
+                    ]}
+                  >
+                    {view}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => setFilterVisible(false)}
+              >
+                <Text style={styles.modalButtonCancelText}>Cancel</Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalButton}
                 onPress={() => setFilterVisible(false)}
               >
                 <Text style={styles.modalButtonText}>Apply</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonReset]}
-                onPress={() => {
-                  setMinPrice('');
-                  setMaxPrice('');
-                  setMinCapacity('');
-                  setFilterVisible(false);
-                }}
-              >
-                <Text
-                  style={[styles.modalButtonText, styles.modalButtonResetText]}
-                >
-                  Reset
-                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -362,27 +545,67 @@ export default function ExploreScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
-  headerContainer: { zIndex: 1 },
-  gridContainer: { paddingHorizontal: 8, paddingBottom: 24 },
-  columnWrapper: { justifyContent: 'space-between' },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 12, fontSize: 16, color: '#64748b' },
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  headerContainer: {
+    zIndex: 1,
+  },
+  gridContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 30,
+    // Tăng chiều cao cho phần chính hiển thị danh sách phòng
+    minHeight: Dimensions.get('window').height * 0.5,
+  },
+  columnWrapper: {
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
 
   // Banner styles
-  bannerContainer: { height: 180, position: 'relative', marginBottom: 16 },
-  bannerImage: { width: '100%', height: '100%' },
+  bannerContainer: {
+    height: 240,
+    position: 'relative',
+  },
   bannerOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.3)',
   },
-  bannerText: {
+  bannerContent: {
     position: 'absolute',
-    bottom: 16,
+    bottom: 24,
     left: 16,
-    fontSize: 24,
+    right: 16,
+  },
+  bannerTitle: {
+    fontSize: 32,
     fontWeight: 'bold',
     color: '#fff',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  bannerText: {
+    fontSize: 18,
+    color: '#fff',
+    marginTop: 4,
+    marginBottom: 16,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  specialOffersButton: {
+    backgroundColor: '#0e7490',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 30,
+    alignSelf: 'flex-start',
+  },
+  specialOffersButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
   },
 
   // Search styles
@@ -390,15 +613,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 16,
+    marginTop: -20,
     marginBottom: 16,
     backgroundColor: '#fff',
-    borderRadius: 12,
-    height: 48,
+    borderRadius: 30,
+    height: 50,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  searchIcon: { marginLeft: 12 },
+  searchIcon: {
+    marginLeft: 16,
+  },
   searchInput: {
     flex: 1,
     paddingVertical: 10,
@@ -410,26 +641,116 @@ const styles = StyleSheet.create({
   filterButton: {
     position: 'absolute',
     right: 8,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#0891b2',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#0e7490',
     justifyContent: 'center',
     alignItems: 'center',
   },
 
-  // Tabs styles
-  tabsContainer: { paddingHorizontal: 16, marginBottom: 12 },
+  // Section header styles
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1e293b',
+  },
+
+  // Featured experiences styles
+  experiencesContainer: {
+    paddingLeft: 16,
+    paddingRight: 8,
+    marginBottom: 16,
+  },
+  experienceCard: {
+    width: 200,
+    height: 140,
+    borderRadius: 12,
+    marginRight: 12,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  experienceExtraInfo: {
+    marginTop: 4,
+  },
+  experienceCapacity: {
+    fontSize: 12,
+    color: '#fff',
+    marginBottom: 2,
+  },
+  experienceAmenities: {
+    fontSize: 12,
+    color: '#fff',
+  },
+
+  experienceImage: {
+    width: '100%',
+    height: '100%',
+  },
+  experienceOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+  },
+  experienceContent: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 12,
+  },
+  experienceTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  experiencePrice: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#fff',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+
+  // Tabs styles (Category)
+  tabsContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
   categoryTab: {
-    paddingVertical: 8,
+    paddingVertical: 10,
     paddingHorizontal: 16,
     backgroundColor: '#e2e8f0',
     borderRadius: 20,
     marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
-  categoryTabActive: { backgroundColor: '#0891b2' },
-  categoryTabText: { fontSize: 14, color: '#64748b', fontWeight: '500' },
-  categoryTabTextActive: { color: '#fff' },
+  categoryTabActive: {
+    backgroundColor: '#fff',
+    borderColor: '#0e7490',
+  },
+  categoryTabText: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  categoryTabTextActive: {
+    color: '#0e7490',
+    fontWeight: '600',
+  },
 
   // Room Card styles
   card: {
@@ -437,38 +758,109 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     margin: 8,
     flex: 1,
+    maxWidth: (SCREEN_WIDTH - 40) / 2,
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 3,
+    overflow: 'hidden',
   },
   cardImage: {
     width: '100%',
-    height: 140,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    height: 130,
+    position: 'relative',
   },
-  cardBody: { padding: 12 },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 4,
-  },
-  cardDescription: { fontSize: 14, color: '#64748b', marginBottom: 8 },
-  cardFooter: {
+  viewBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: 'rgba(14, 116, 144, 0.8)',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  cardPrice: { fontSize: 16, fontWeight: 'bold', color: '#0891b2' },
-  ratingContainer: { flexDirection: 'row', alignItems: 'center' },
+  viewBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  cardBody: {
+    padding: 12,
+  },
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1e293b',
+  },
+  roomNumber: {
+    fontSize: 12,
+    color: '#64748b',
+    marginBottom: 8,
+  },
+  amenitiesRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  amenityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  amenityText: {
+    fontSize: 12,
+    color: '#64748b',
+    marginLeft: 4,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cardPrice: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#0e7490',
+  },
+  perNight: {
+    fontSize: 12,
+    color: '#64748b',
+    marginRight: 8,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 'auto',
+  },
   ratingText: {
     marginLeft: 4,
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '500',
     color: '#1e293b',
+  },
+
+  // Empty state styles
+  emptyContainer: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#64748b',
+    marginBottom: 16,
+  },
+  resetButton: {
+    backgroundColor: '#0e7490',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+  },
+  resetButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
   },
 
   // Pagination styles
@@ -476,10 +868,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
   },
-  paginationButton: { paddingHorizontal: 12, paddingVertical: 6 },
-  paginationText: { fontSize: 16, fontWeight: '500', color: '#1e293b' },
+  paginationButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#0e7490',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 8,
+  },
+  paginationButtonDisabled: {
+    backgroundColor: '#e2e8f0',
+  },
+  paginationText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1e293b',
+    marginHorizontal: 8,
+  },
 
   // Modal styles
   modalOverlay: {
@@ -488,34 +897,96 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 16,
   },
-  modalContainer: { backgroundColor: '#fff', borderRadius: 12, padding: 16 },
+  modalContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+  },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#1e293b',
-    marginBottom: 12,
+    marginBottom: 16,
+    textAlign: 'center',
   },
-  modalLabel: { fontSize: 14, color: '#64748b', marginTop: 8 },
+  modalLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginTop: 12,
+  },
   modalInput: {
     borderWidth: 1,
     borderColor: '#e2e8f0',
     borderRadius: 8,
-    padding: 8,
-    marginTop: 4,
+    padding: 12,
+    marginTop: 8,
     color: '#1e293b',
+    fontSize: 15,
+  },
+  priceInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  priceInput: {
+    flex: 1,
+    marginTop: 0,
+  },
+  priceSeparator: {
+    marginHorizontal: 12,
+    color: '#64748b',
+  },
+  viewOptionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+  },
+  viewOption: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: '#f1f5f9',
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  viewOptionSelected: {
+    backgroundColor: '#0e7490',
+  },
+  viewOptionText: {
+    fontSize: 14,
+    color: '#64748b',
+  },
+  viewOptionTextSelected: {
+    color: '#fff',
+    fontWeight: '600',
   },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 16,
+    marginTop: 24,
   },
   modalButton: {
-    backgroundColor: '#0891b2',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    flex: 1,
+    backgroundColor: '#0e7490',
+    paddingVertical: 12,
+    borderRadius: 30,
+    alignItems: 'center',
+    marginHorizontal: 4,
   },
-  modalButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  modalButtonReset: { backgroundColor: '#ef4444' },
-  modalButtonResetText: { color: '#fff' },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalButtonCancel: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  modalButtonCancelText: {
+    color: '#64748b',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });
