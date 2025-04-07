@@ -25,6 +25,7 @@ import PopularServices, { Service } from '../components/PopularServices';
 import QuickActions from '../components/QuickActions';
 import LoadingAnimation from '../components/LoadingAnimation';
 import ReviewRating from '../components/ReviewRating';
+import WeatherForecast from '../components/WeatherForecast';
 
 type Room = {
   id: string;
@@ -209,12 +210,16 @@ export default function HomeScreen() {
           />
           {/* Overlay mờ & Tiêu đề chào mừng */}
           <View style={styles.overlay}>
+            {/* DỰ BÁO THỜI TIẾT */}
+            <WeatherForecast />
             <Text style={styles.mainGreeting}>
-              Welcome {profile?.full_name ? `, ${profile.full_name}` : ''}
+              Welcome to Kiatt
+              {profile?.full_name ? `, ${profile.full_name}` : ''}
             </Text>
             <Text style={styles.subGreeting}>
-              Ready to explore Kiatt Resort & Spa?
+              Discover luxury and tranquility in paradise
             </Text>
+
             {/* Icon ChevronsDown sẽ fade out khi cuộn xuống */}
             <Animated.View
               style={{
@@ -231,7 +236,7 @@ export default function HomeScreen() {
         <View style={styles.contentContainer}>
           {/* Quick Actions */}
           <QuickActions />
-          {/* Featured Rooms (Dọc) */}
+          {/* Featured Rooms */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Featured Rooms</Text>
             <Link href="/(tabs)/explore" asChild>
@@ -591,7 +596,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   faqContainer: {
-    // Khoảng cách giữa tiêu đề và FAQItem
     marginTop: 16,
   },
 });

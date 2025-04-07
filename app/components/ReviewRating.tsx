@@ -1,4 +1,3 @@
-// components/ReviewRating.tsx
 import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
@@ -9,15 +8,26 @@ import {
   FlatList,
   Alert,
   Image,
+  ImageBackground,
 } from 'react-native';
 import { supabase } from '@/lib/supabase';
-import { Star, Heart, Edit3 as EditIcon } from 'lucide-react-native';
+import {
+  Star,
+  Heart,
+  TreePalm,
+  Edit3,
+  Umbrella,
+  Sun,
+  MapPin,
+} from 'lucide-react-native';
 import {
   RealtimeChannel,
   RealtimePostgresInsertPayload,
   RealtimePostgresUpdatePayload,
   RealtimePostgresDeletePayload,
 } from '@supabase/supabase-js';
+import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 
 type Review = {
   id: string;
@@ -47,9 +57,7 @@ export default function ReviewRating() {
   const [editingReviewText, setEditingReviewText] = useState('');
   const [editingReviewRating, setEditingReviewRating] = useState(5);
 
-  // --------------------------
   // FETCH CURRENT USER & ELIGIBILITY
-  // --------------------------
   const fetchEligibility = async () => {
     try {
       const {
@@ -72,9 +80,7 @@ export default function ReviewRating() {
     }
   };
 
-  // --------------------------
-  // FETCH REVIEWS & RELOAD DỮ LIỆU
-  // --------------------------
+  // FETCH REVIEWS
   const fetchReviews = async () => {
     try {
       const { data, error } = await supabase
@@ -91,9 +97,7 @@ export default function ReviewRating() {
     }
   };
 
-  // --------------------------
   // FETCH PROFILE NAME (FULL NAME) FOR USER
-  // --------------------------
   const fetchProfileName = async (userId: string) => {
     if (profileNames[userId]) return;
     try {
@@ -124,9 +128,7 @@ export default function ReviewRating() {
     });
   }, [reviews]);
 
-  // --------------------------
   // REALTIME SUBSCRIPTION: INSERT, UPDATE, DELETE
-  // --------------------------
   useEffect(() => {
     const channel: RealtimeChannel = supabase
       .channel('reviews-changes')
@@ -134,25 +136,22 @@ export default function ReviewRating() {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'reviews' },
         (payload: RealtimePostgresInsertPayload<Review>) => {
-          // Reload reviews when a new review is inserted
           fetchReviews();
-        }
+        },
       )
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'reviews' },
         (payload: RealtimePostgresUpdatePayload<Review>) => {
-          // Reload reviews when a review is updated
           fetchReviews();
-        }
+        },
       )
       .on(
         'postgres_changes',
         { event: 'DELETE', schema: 'public', table: 'reviews' },
         (payload: RealtimePostgresDeletePayload<Review>) => {
-          // Reload reviews when a review is deleted
           fetchReviews();
-        }
+        },
       )
       .subscribe();
 
@@ -161,9 +160,7 @@ export default function ReviewRating() {
     };
   }, []);
 
-  // --------------------------
   // HANDLE SUBMIT NEW REVIEW
-  // --------------------------
   const handleSubmitReview = async () => {
     try {
       const {
@@ -174,12 +171,12 @@ export default function ReviewRating() {
       if (!isEligible) {
         Alert.alert(
           'Review Error',
-          'You must have a valid booking to submit a review.'
+          'You must have completed a stay with us to share your experience.',
         );
         return;
       }
 
-      // Nếu đang ở chế độ chỉnh sửa, gọi saveEditedReview() thay vì insert mới
+      // If editing, save the edited review
       if (editingReviewId) {
         await saveEditedReview();
         return;
@@ -188,7 +185,7 @@ export default function ReviewRating() {
       const { error } = await supabase.from('reviews').insert([
         {
           user_id: user.id,
-          booking_type: 'room/service',
+          booking_type: 'resort/stay',
           booking_id: null,
           rating: newRating,
           comment: newComment,
@@ -197,10 +194,12 @@ export default function ReviewRating() {
       ]);
       if (error) throw error;
 
-      Alert.alert('Review Submitted', 'Thank you for your review!');
+      Alert.alert(
+        'Thank You!',
+        'Your review has been shared with the community!',
+      );
       setNewComment('');
       setNewRating(5);
-      // Reload data after insert
       fetchReviews();
     } catch (error) {
       console.error('Error submitting review:', error);
@@ -208,9 +207,7 @@ export default function ReviewRating() {
     }
   };
 
-  // --------------------------
   // HANDLE TOGGLE LIKE FOR A REVIEW
-  // --------------------------
   const handleToggleLike = async (review: Review) => {
     if (!currentUserId) return;
     try {
@@ -225,7 +222,6 @@ export default function ReviewRating() {
         .eq('id', review.id);
       if (error) throw error;
 
-      // Reload data after update
       fetchReviews();
     } catch (error) {
       console.error('Error toggling like:', error);
@@ -233,9 +229,7 @@ export default function ReviewRating() {
     }
   };
 
-  // --------------------------
   // HANDLE EDIT REVIEW (START, CANCEL, SAVE)
-  // --------------------------
   const startEditing = (review: Review) => {
     setEditingReviewId(review.id);
     setEditingReviewText(review.comment);
@@ -256,9 +250,8 @@ export default function ReviewRating() {
         .update({ comment: editingReviewText, rating: editingReviewRating })
         .eq('id', editingReviewId);
       if (error) throw error;
-      Alert.alert('Review Updated', 'Your review has been updated.');
+      Alert.alert('Review Updated', 'Your vacation memory has been updated!');
       cancelEditing();
-      // Reload data after update
       fetchReviews();
     } catch (error) {
       console.error('Error updating review:', error);
@@ -266,20 +259,16 @@ export default function ReviewRating() {
     }
   };
 
-  // --------------------------
   // CALCULATE AVERAGE RATING
-  // --------------------------
   const averageRating = useMemo(() => {
     if (reviews.length === 0) return 0;
     const sum = reviews.reduce((acc, item) => acc + item.rating, 0);
     return (sum / reviews.length).toFixed(1);
   }, [reviews]);
 
-  // --------------------------
   // CALCULATE STAR DISTRIBUTION (5 -> 1)
-  // --------------------------
   const starDistribution = useMemo(() => {
-    const distribution = [0, 0, 0, 0, 0]; // index 0: 5 stars, index 4: 1 star
+    const distribution = [0, 0, 0, 0, 0];
     reviews.forEach((item) => {
       const starIndex = 5 - item.rating;
       distribution[starIndex] += 1;
@@ -287,18 +276,23 @@ export default function ReviewRating() {
     return distribution;
   }, [reviews]);
 
+  // GET TOP 3 MOST LIKED REVIEWS
+  const topLikedReviews = useMemo(() => {
+    return [...reviews]
+      .sort((a, b) => b.liked_by.length - a.liked_by.length)
+      .slice(0, 3);
+  }, [reviews]);
+
   const totalReviews = reviews.length;
 
-  // --------------------------
   // RENDER STAR DISTRIBUTION ROW
-  // --------------------------
   const renderStarRow = (star: number, count: number) => {
     const percentage = totalReviews === 0 ? 0 : (count / totalReviews) * 100;
     return (
       <View style={styles.starRow} key={star}>
         <View style={styles.starRowLabelContainer}>
           <Text style={styles.starRowLabel}>{star}</Text>
-          <Star color="#fbbf24" fill={'#fbbf24'} size={14} />
+          <Star color="#FFD700" fill="#FFD700" size={14} />
         </View>
         <View style={styles.progressBar}>
           <View style={[styles.progressFill, { width: `${percentage}%` }]} />
@@ -308,122 +302,133 @@ export default function ReviewRating() {
     );
   };
 
-  // --------------------------
   // RENDER EACH REVIEW ITEM
-  // --------------------------
   const renderReviewItem = ({ item }: { item: Review }) => {
     const userLiked =
       currentUserId && item.liked_by.includes(currentUserId) ? true : false;
     const reviewerName =
-      profileNames[item.user_id] || `User ${item.user_id.slice(0, 6)}`;
+      profileNames[item.user_id] || `Traveler ${item.user_id.slice(0, 4)}`;
     const isEditing = editingReviewId === item.id;
 
     return (
       <View style={styles.reviewCard}>
-        <View style={styles.reviewHeader}>
-          <View style={styles.userInfo}>
-            <Image
-              source={{
-                uri: 'https://i.pravatar.cc/150?u=' + item.user_id,
-              }}
-              style={styles.avatar}
-            />
-            <View style={styles.userText}>
-              <Text style={styles.username}>{reviewerName}</Text>
-              <Text style={styles.reviewDate}>
-                {new Date(item.created_at).toLocaleDateString()}
-              </Text>
+        <ImageBackground
+          source={{
+            uri: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=2940&auto=format&fit=crop',
+          }}
+          style={styles.reviewCardBackground}
+          imageStyle={{ opacity: 0.05, borderRadius: 16 }}
+        >
+          <View style={styles.reviewHeader}>
+            <View style={styles.userInfo}>
+              <Image
+                source={{
+                  uri: 'https://i.pravatar.cc/150?u=' + item.user_id,
+                }}
+                style={styles.avatar}
+              />
+              <View style={styles.userText}>
+                <Text style={styles.username}>{reviewerName}</Text>
+                <View style={styles.dateLocationRow}>
+                  <MapPin size={12} color="#0891b2" />
+                  <Text style={styles.reviewDate}>
+                    {new Date(item.created_at).toLocaleDateString()}
+                  </Text>
+                </View>
+              </View>
             </View>
-          </View>
-          <View style={styles.starsContainer}>
-            {Array.from({ length: 5 }).map((_, index) => {
-              const starValue = index + 1;
-              return (
-                <Star
-                  key={index}
-                  color={starValue <= item.rating ? '#fbbf24' : '#e2e8f0'}
-                  fill={starValue <= item.rating ? '#fbbf24' : 'transparent'}
-                  size={16}
-                />
-              );
-            })}
-          </View>
-        </View>
-        {isEditing ? (
-          // EDIT MODE (chỉ cho chủ sở hữu review)
-          <View style={styles.editContainer}>
-            <View style={styles.editStars}>
+            <View style={styles.starsContainer}>
               {Array.from({ length: 5 }).map((_, index) => {
                 const starValue = index + 1;
                 return (
-                  <TouchableOpacity
+                  <Star
                     key={index}
-                    onPress={() => setEditingReviewRating(starValue)}
-                  >
-                    <Star
-                      color={
-                        starValue <= editingReviewRating ? '#fbbf24' : '#e2e8f0'
-                      }
-                      fill={
-                        starValue <= editingReviewRating
-                          ? '#fbbf24'
-                          : 'transparent'
-                      }
-                      size={20}
-                      style={styles.starIcon}
-                    />
-                  </TouchableOpacity>
+                    color={starValue <= item.rating ? '#FFD700' : '#e2e8f0'}
+                    fill={starValue <= item.rating ? '#FFD700' : 'transparent'}
+                    size={16}
+                  />
                 );
               })}
             </View>
-            <TextInput
-              style={styles.textInput}
-              value={editingReviewText}
-              onChangeText={setEditingReviewText}
-              multiline
-            />
-            <View style={styles.editButtons}>
-              <TouchableOpacity
-                style={[styles.submitButton, styles.editSubmitButton]}
-                onPress={saveEditedReview}
-              >
-                <Text style={styles.submitButtonText}>Save</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.submitButton, styles.editCancelButton]}
-                onPress={cancelEditing}
-              >
-                <Text style={styles.submitButtonText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
           </View>
-        ) : (
-          <>
-            <Text style={styles.reviewComment}>{item.comment}</Text>
-            <View style={styles.likeContainer}>
-              <TouchableOpacity
-                style={styles.likeButton}
-                onPress={() => handleToggleLike(item)}
-              >
-                <Heart
-                  color={userLiked ? '#e11d48' : '#94a3b8'}
-                  fill={userLiked ? '#e11d48' : 'transparent'}
-                  size={20}
-                />
-              </TouchableOpacity>
-              <Text style={styles.likeCount}>{item.liked_by.length}</Text>
-              {currentUserId === item.user_id && (
+          {isEditing ? (
+            // EDIT MODE
+            <View style={styles.editContainer}>
+              <View style={styles.editStars}>
+                {Array.from({ length: 5 }).map((_, index) => {
+                  const starValue = index + 1;
+                  return (
+                    <TouchableOpacity
+                      key={index}
+                      onPress={() => setEditingReviewRating(starValue)}
+                    >
+                      <Star
+                        color={
+                          starValue <= editingReviewRating
+                            ? '#FFD700'
+                            : '#e2e8f0'
+                        }
+                        fill={
+                          starValue <= editingReviewRating
+                            ? '#FFD700'
+                            : 'transparent'
+                        }
+                        size={20}
+                        style={styles.starIcon}
+                      />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <TextInput
+                style={styles.textInput}
+                value={editingReviewText}
+                onChangeText={setEditingReviewText}
+                multiline
+              />
+              <View style={styles.editButtons}>
                 <TouchableOpacity
-                  style={styles.editButton}
-                  onPress={() => startEditing(item)}
+                  style={[styles.submitButton, styles.editSubmitButton]}
+                  onPress={saveEditedReview}
                 >
-                  <EditIcon size={20} color="#0891b2" />
-                  <Text style={styles.editButtonText}>Edit</Text>
+                  <Text style={styles.submitButtonText}>Save</Text>
                 </TouchableOpacity>
-              )}
+                <TouchableOpacity
+                  style={[styles.submitButton, styles.editCancelButton]}
+                  onPress={cancelEditing}
+                >
+                  <Text style={styles.submitButtonText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </>
-        )}
+          ) : (
+            <>
+              <Text style={styles.reviewComment}>{item.comment}</Text>
+              <View style={styles.likeContainer}>
+                <TouchableOpacity
+                  style={styles.likeButton}
+                  onPress={() => handleToggleLike(item)}
+                >
+                  <Heart
+                    color={userLiked ? '#e11d48' : '#94a3b8'}
+                    fill={userLiked ? '#e11d48' : 'transparent'}
+                    size={20}
+                  />
+                </TouchableOpacity>
+                <Text style={styles.likeCount}>{item.liked_by.length}</Text>
+                {currentUserId === item.user_id && (
+                  <TouchableOpacity
+                    style={styles.editButton}
+                    onPress={() => startEditing(item)}
+                  >
+                    <Edit3 size={16} color="#0891b2" />
+                    <Text style={styles.editButtonText}>Edit</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </>
+          )}
+        </ImageBackground>
       </View>
     );
   };
@@ -431,13 +436,30 @@ export default function ReviewRating() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <Text>Loading reviews...</Text>
+        <Sun size={24} color="#FFD700" />
+        <Text style={styles.loadingText}>Loading paradise reviews...</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
+      {/* Header with Palm Tree icon */}
+      <View style={styles.headerContainer}>
+        <LinearGradient
+          colors={['rgba(8, 145, 178, 0.7)', 'rgba(8, 145, 178, 0.3)']}
+          style={styles.headerGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+        >
+          <View style={styles.headerContent}>
+            <TreePalm size={24} color="#ffffff" />
+            <Text style={styles.headerText}>Review and Rating</Text>
+            <Umbrella size={24} color="#ffffff" />
+          </View>
+        </LinearGradient>
+      </View>
+
       {/* Top Section: Overall Rating & Star Distribution */}
       <View style={styles.topSection}>
         <View style={styles.overallRatingContainer}>
@@ -450,12 +472,12 @@ export default function ReviewRating() {
                   key={index}
                   color={
                     starValue <= Math.round(Number(averageRating))
-                      ? '#fbbf24'
+                      ? '#FFD700'
                       : '#e2e8f0'
                   }
                   fill={
                     starValue <= Math.round(Number(averageRating))
-                      ? '#fbbf24'
+                      ? '#FFD700'
                       : 'transparent'
                   }
                   size={16}
@@ -464,7 +486,9 @@ export default function ReviewRating() {
               );
             })}
           </View>
-          <Text style={styles.totalReviewText}>{totalReviews} reviews</Text>
+          <Text style={styles.totalReviewText}>
+            {totalReviews} memories shared
+          </Text>
         </View>
         <View style={styles.starDistribution}>
           {renderStarRow(5, starDistribution[0])}
@@ -475,31 +499,45 @@ export default function ReviewRating() {
         </View>
       </View>
 
-      {/* Reviews List - chỉ hiển thị 3 review mới nhất */}
+      {/* Reviews List - Top Liked Reviews */}
       <View style={styles.listHeaderRow}>
-        <Text style={styles.sectionTitle}>Recent Reviews</Text>
-        <TouchableOpacity style={styles.viewAllButton}>
+        <View style={styles.sectionTitleContainer}>
+          <Text style={styles.sectionTitle}>Top Guest Experiences</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.viewAllButton}
+          onPress={() => router.push('/reviewrating/reviewrating')}
+        >
           <Text style={styles.viewAllText}>View All</Text>
         </TouchableOpacity>
       </View>
+
       {reviews.length > 0 ? (
         <FlatList
-          data={reviews.slice(0, 3)}
+          data={topLikedReviews}
           renderItem={renderReviewItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.reviewsList}
           scrollEnabled={false}
         />
       ) : (
-        <Text style={styles.emptyText}>No reviews yet.</Text>
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No vacation memories shared yet.</Text>
+          <Text style={styles.emptySubtext}>
+            Be the first to share your experience!
+          </Text>
+        </View>
       )}
 
-      {/* Your Review Form (giao diện nhỏ gọn, hiện đại) */}
+      {/* Your Review Form */}
       {isEligible && (
         <View style={styles.reviewForm}>
-          <Text style={styles.formTitle}>Your Review</Text>
+          <View style={styles.formTitleContainer}>
+            <TreePalm size={18} color="#0891b2" />
+            <Text style={styles.formTitle}>Share Your Resort Experience</Text>
+          </View>
           <View style={styles.ratingInputContainer}>
-            <Text style={styles.inputLabel}>Rating:</Text>
+            <Text style={styles.inputLabel}>Your Rating:</Text>
             <View style={styles.starsInput}>
               {Array.from({ length: 5 }).map((_, index) => {
                 const starValue = index + 1;
@@ -509,8 +547,8 @@ export default function ReviewRating() {
                     onPress={() => setNewRating(starValue)}
                   >
                     <Star
-                      color={starValue <= newRating ? '#fbbf24' : '#e2e8f0'}
-                      fill={starValue <= newRating ? '#fbbf24' : 'transparent'}
+                      color={starValue <= newRating ? '#FFD700' : '#e2e8f0'}
+                      fill={starValue <= newRating ? '#FFD700' : 'transparent'}
                       size={24}
                       style={styles.starIcon}
                     />
@@ -521,7 +559,7 @@ export default function ReviewRating() {
           </View>
           <TextInput
             style={[styles.textInput, styles.yourReviewTextInput]}
-            placeholder="Enter your review..."
+            placeholder="Tell us about your stay at our resort..."
             placeholderTextColor="#94a3b8"
             value={newComment}
             onChangeText={setNewComment}
@@ -531,7 +569,7 @@ export default function ReviewRating() {
             style={styles.submitButton}
             onPress={handleSubmitReview}
           >
-            <Text style={styles.submitButtonText}>Submit Review</Text>
+            <Text style={styles.submitButtonText}>Share Your Experience</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -543,22 +581,50 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: '#fff',
     borderRadius: 16,
-    padding: 16,
     marginVertical: 16,
+    overflow: 'hidden',
     elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+  },
+  headerContainer: {
+    overflow: 'hidden',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+  },
+  headerGradient: {
+    paddingVertical: 16,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginHorizontal: 12,
   },
   loadingContainer: {
     alignItems: 'center',
-    padding: 20,
+    justifyContent: 'center',
+    padding: 30,
+    backgroundColor: '#f0f9ff',
+    borderRadius: 16,
+  },
+  loadingText: {
+    color: '#0891b2',
+    marginTop: 10,
+    fontSize: 16,
   },
   /* Top Section: Overall Rating & Distribution */
   topSection: {
     flexDirection: 'row',
-    marginBottom: 16,
+    padding: 16,
+    backgroundColor: '#f0f9ff',
   },
   overallRatingContainer: {
     width: '40%',
@@ -571,7 +637,7 @@ const styles = StyleSheet.create({
   overallRating: {
     fontSize: 48,
     fontWeight: 'bold',
-    color: '#0f172a',
+    color: '#0891b2',
   },
   starRowInline: {
     flexDirection: 'row',
@@ -580,7 +646,8 @@ const styles = StyleSheet.create({
   totalReviewText: {
     fontSize: 14,
     color: '#64748b',
-    marginTop: 4,
+    marginTop: 6,
+    textAlign: 'center',
   },
   starDistribution: {
     flex: 1,
@@ -590,7 +657,7 @@ const styles = StyleSheet.create({
   starRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   starRowLabelContainer: {
     flexDirection: 'row',
@@ -601,6 +668,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#0f172a',
     marginRight: 2,
+    fontWeight: '500',
   },
   progressBar: {
     flex: 1,
@@ -610,7 +678,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   progressFill: {
-    backgroundColor: '#fbbf24',
+    backgroundColor: '#0891b2',
     height: '100%',
     borderRadius: 4,
   },
@@ -618,23 +686,31 @@ const styles = StyleSheet.create({
     width: 30,
     textAlign: 'right',
     color: '#0f172a',
+    fontWeight: '500',
   },
   /* Reviews List */
   listHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
-    marginTop: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#ffffff',
+  },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1e293b',
+    color: '#0891b2',
   },
   viewAllButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#e0f2fe',
+    borderRadius: 20,
   },
   viewAllText: {
     fontSize: 14,
@@ -642,132 +718,171 @@ const styles = StyleSheet.create({
     color: '#0891b2',
   },
   reviewsList: {
-    marginBottom: 16,
+    padding: 16,
+    backgroundColor: '#ffffff',
   },
   reviewCard: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
+    marginBottom: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  reviewCardBackground: {
+    padding: 16,
   },
   reviewHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 10,
   },
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginRight: 12,
+    borderWidth: 2,
+    borderColor: '#0891b2',
   },
   userText: {
     justifyContent: 'center',
   },
   username: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: '#0f172a',
+  },
+  dateLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
   },
   reviewDate: {
     fontSize: 12,
     color: '#64748b',
+    marginLeft: 4,
   },
   starsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   reviewComment: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#1e293b',
-    marginBottom: 8,
+    marginBottom: 12,
+    lineHeight: 22,
+    fontStyle: 'italic',
   },
   likeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 8,
   },
   likeButton: {
-    marginRight: 4,
+    marginRight: 6,
   },
   likeCount: {
     fontSize: 14,
-    color: '#0f172a',
+    color: '#64748b',
   },
   editButton: {
     marginLeft: 16,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: '#e2e8f0',
-    borderRadius: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: '#e0f2fe',
+    borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
   },
   editButtonText: {
     fontSize: 12,
-    color: '#0f172a',
+    color: '#0891b2',
     marginLeft: 4,
+    fontWeight: '500',
+  },
+  emptyContainer: {
+    padding: 30,
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
   },
   emptyText: {
     fontStyle: 'italic',
     color: '#64748b',
     textAlign: 'center',
-    marginBottom: 16,
+    fontSize: 16,
+  },
+  emptySubtext: {
+    color: '#94a3b8',
+    marginTop: 8,
+    textAlign: 'center',
   },
   /* Review Form (Your Review) */
   reviewForm: {
     borderTopWidth: 1,
     borderTopColor: '#e2e8f0',
-    paddingTop: 12,
-    paddingHorizontal: 8,
-    marginTop: 16,
+    padding: 16,
+    backgroundColor: '#f8fafc',
+  },
+  formTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   formTitle: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 8,
-    color: '#1e293b',
+    marginLeft: 8,
+    color: '#0891b2',
   },
   ratingInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   inputLabel: {
-    fontSize: 14,
+    fontSize: 15,
     marginRight: 8,
     color: '#1e293b',
+    fontWeight: '500',
   },
   starsInput: {
     flexDirection: 'row',
   },
   starIcon: {
-    marginHorizontal: 2,
+    marginHorizontal: 3,
   },
   textInput: {
     borderWidth: 1,
     borderColor: '#cbd5e1',
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 14,
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 15,
     color: '#1e293b',
-    minHeight: 60,
+    minHeight: 100,
     textAlignVertical: 'top',
-    marginBottom: 8,
+    marginBottom: 12,
+    backgroundColor: '#ffffff',
   },
   yourReviewTextInput: {
-    // Điều chỉnh kích thước nhỏ gọn hơn cho "Your Review"
-    minHeight: 50,
-    padding: 8,
+    minHeight: 80,
   },
   submitButton: {
     backgroundColor: '#0891b2',
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
     alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
   },
   submitButtonText: {
     color: '#fff',
@@ -776,10 +891,11 @@ const styles = StyleSheet.create({
   },
   /* Edit review section */
   editContainer: {
-    marginVertical: 8,
+    marginVertical: 10,
   },
   editStars: {
     flexDirection: 'row',
+    marginBottom: 10,
   },
   editButtons: {
     flexDirection: 'row',

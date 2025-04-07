@@ -4,22 +4,31 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
   Linking,
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 
-// const { width: screenWidth } = Dimensions.get('window');
+const latitude = parseFloat(process.env.EXPO_PUBLIC_LATITUDE || '0');
+const longitude = parseFloat(process.env.EXPO_PUBLIC_LONGITUDE || '0');
 
+// // Kiểm tra nếu `latitude` hoặc `longitude` bị lỗi (0 có thể là lỗi)
+// if (latitude === 0 || longitude === 0) {
+//   console.warn(
+//     ' Biến môi trường EXPO_PUBLIC_LATITUDE hoặc EXPO_PUBLIC_LONGITUDE chưa được thiết lập!'
+//   );
+// }
+
+// Thiết lập tọa độ bản đồ
 const miniMapRegion = {
-  latitude: 15.975497503324593,
-  longitude: 108.25320554502127,
+  latitude,
+  longitude,
   latitudeDelta: 0.02,
   longitudeDelta: 0.02,
 };
+
 export default function MapDirections() {
   const handleGetDirections = () => {
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${miniMapRegion.latitude},${miniMapRegion.longitude}`;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
     Linking.openURL(url);
   };
 
@@ -29,10 +38,7 @@ export default function MapDirections() {
       <View style={styles.miniMapContainer}>
         <MapView style={styles.miniMap} initialRegion={miniMapRegion}>
           <Marker
-            coordinate={{
-              latitude: miniMapRegion.latitude,
-              longitude: miniMapRegion.longitude,
-            }}
+            coordinate={{ latitude, longitude }}
             title="Kiatt Resort & Spa"
             description="Your perfect getaway"
           />

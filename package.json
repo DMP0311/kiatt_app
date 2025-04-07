@@ -16,6 +16,7 @@
     "@react-navigation/bottom-tabs": "^7.2.0",
     "@react-navigation/native": "^7.0.14",
     "@supabase/supabase-js": "^2.49.1",
+    "axios": "^1.8.4",
     "date-fns": "^3.3.1",
     "expo": "52.0.33",
     "expo-auth-session": "~5.4.0",
@@ -30,7 +31,7 @@
     "expo-linear-gradient": "^14.0.2",
     "expo-linking": "^7.0.5",
     "expo-notifications": "^0.29.14",
-    "expo-router": "4.0.17",
+    "expo-router": "~4.0.20",
     "expo-secure-store": "~12.8.1",
     "expo-splash-screen": "^0.29.21",
     "expo-status-bar": "^2.0.1",
@@ -38,6 +39,8 @@
     "expo-system-ui": "^4.0.7",
     "expo-video": "~2.0.6",
     "expo-web-browser": "^14.0.2",
+    "javascript-time-ago": "^2.5.11",
+    "lottie-react-native": "7.1.0",
     "lucide-react-native": "^0.475.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
@@ -58,8 +61,7 @@
     "react-native-url-polyfill": "^2.0.0",
     "react-native-web": "^0.19.13",
     "react-native-webview": "13.12.5",
-    "resend": "^4.1.2",
-    "lottie-react-native": "7.1.0"
+    "resend": "^4.1.2"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

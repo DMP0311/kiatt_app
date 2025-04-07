@@ -142,7 +142,7 @@ export default function ProfileScreen() {
       setProfile((prev) =>
         prev
           ? { ...prev, full_name: newFullName, phone_number: newPhone }
-          : prev
+          : prev,
       );
       setEditing(false);
       Alert.alert('Success', 'Profile updated successfully!');
@@ -162,7 +162,7 @@ export default function ProfileScreen() {
     if (newPassword !== confirmPassword) {
       Alert.alert(
         'Validation',
-        'New password and confirm password do not match.'
+        'New password and confirm password do not match.',
       );
       return;
     }
@@ -207,7 +207,7 @@ export default function ProfileScreen() {
       if (!permissionResult.granted) {
         Alert.alert(
           'Permission required',
-          'Permission to access your media library is required!'
+          'Permission to access your media library is required!',
         );
         return;
       }
@@ -233,7 +233,7 @@ export default function ProfileScreen() {
       const { data } = supabase.storage.from('avatars').getPublicUrl(fileName);
       if (!data.publicUrl) {
         throw new Error(
-          'Cannot get public URL (file not found or bucket error).'
+          'Cannot get public URL (file not found or bucket error).',
         );
       }
       const publicURL = data.publicUrl;
@@ -399,7 +399,7 @@ export default function ProfileScreen() {
           <View style={styles.infoCard}>
             <TouchableOpacity
               style={styles.infoItem}
-              onPress={() => router.push('/reviews/list')}
+              onPress={() => router.push('/reviewrating/reviewrating')}
             >
               <View style={styles.infoIconContainer}>
                 <Star size={20} color="#f59e0b" />

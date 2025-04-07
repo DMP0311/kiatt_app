@@ -18,7 +18,8 @@
     },
     "plugins": [
       "expo-router",
-      "expo-video"
+      "expo-video",
+      "expo-router"
     ],
     "experiments": {
       "typedRoutes": true
